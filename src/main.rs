@@ -72,7 +72,7 @@ impl Driver {
 
         let protocol = Box::pin(protocol);
         self.protocols.insert(next_id, protocol);
-        self.dispatch_message(next_id, start_msg()); // Kick it off.
+        self.dispatch_message(next_id, start_msg()); // Kick it off with a dummy message that is ignored by the protocol.
     }
 
     fn handle_input(&mut self, msg: &[u8]) {
@@ -124,7 +124,10 @@ fn stun(
     server: SocketAddr,
 ) -> impl Coroutine<Message, Yield = (SocketAddr, Message), Return = Event> {
     #[coroutine]
-    move |_: Message| {
+    move |_dummy: Message| {
+        // We ignore the initial message.
+        // Using `Message` as the `resume` type is very ergonomic for yielding but it means we need to pass a `Message` to kick things off.
+
         let request = Message::new(
             MessageClass::Request,
             BINDING,
