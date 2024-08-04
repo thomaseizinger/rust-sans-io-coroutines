@@ -1,0 +1,9 @@
+[package]
+name = "sans-io-generator"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+stun_codec = "0.3.5"
+rand = "0.8.5"
+bytecodec = "0.4.15"
