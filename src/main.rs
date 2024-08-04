@@ -140,8 +140,10 @@ fn stun(
             TransactionId::new(rand::random()),
         );
 
+        // TODO: The resume argument here should likely be a `Result`, so the protocol can learn when something went wrong, like a timeout when waiting for the response.
         let response = yield (server, request); // Send the request and suspend until we have a response.
 
+        // Return argument could be a result too so we can fail the protocol.
         Event::NewMappedAddress(
             response
                 .get_attribute::<XorMappedAddress>()
