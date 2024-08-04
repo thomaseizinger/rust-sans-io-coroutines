@@ -19,6 +19,7 @@ const STUN_CLOUDFLARE_COM: SocketAddr =
 fn main() {
     let mut driver = Driver::default();
 
+    // Execute `stun` 5 times to showcase multiplexing.
     driver.add_protocol(stun(STUN_CLOUDFLARE_COM));
     driver.add_protocol(stun(STUN_CLOUDFLARE_COM));
     driver.add_protocol(stun(STUN_CLOUDFLARE_COM));
@@ -53,6 +54,9 @@ struct Driver {
     >,
     next_id: u64,
 
+    /// Remember, where a transaction ID originated from.
+    ///
+    /// This allows us to know, which coroutine we need to pass the response to.
     pending_protocol_by_transaction_id: HashMap<TransactionId, u64>,
 
     encoder: MessageEncoder<Attribute>,
@@ -76,23 +80,24 @@ impl Driver {
     }
 
     fn handle_input(&mut self, msg: &[u8]) {
-        let msg = self.decoder.decode_from_bytes(msg).unwrap().unwrap();
+        let msg = self.decoder.decode_from_bytes(msg).unwrap().unwrap(); // TODO: Error handling.
 
         let Some(id) = self
             .pending_protocol_by_transaction_id
             .get(&msg.transaction_id())
         else {
-            return;
+            return; // No protocol emitted the request for this transaction ID.
         };
         self.dispatch_message(*id, msg);
     }
 
     fn dispatch_message(&mut self, id: u64, msg: Message) {
         let Entry::Occupied(mut protocol) = self.protocols.entry(id) else {
-            return;
+            return; // Unknown protocol.
         };
 
         match protocol.get_mut().as_mut().resume(msg) {
+            // The protocol is still executing and would like to send another message.
             CoroutineState::Yielded((dst, msg)) => {
                 self.pending_protocol_by_transaction_id
                     .insert(msg.transaction_id(), id);
@@ -101,6 +106,7 @@ impl Driver {
                     payload: self.encoder.encode_into_bytes(msg).unwrap(),
                 })
             }
+            // The protocol finished.
             CoroutineState::Complete(event) => {
                 protocol.remove();
 
@@ -134,7 +140,7 @@ fn stun(
             TransactionId::new(rand::random()),
         );
 
-        let response = yield (server, request);
+        let response = yield (server, request); // Send the request and suspend until we have a response.
 
         Event::NewMappedAddress(
             response
